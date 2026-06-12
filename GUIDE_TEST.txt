@@ -1,0 +1,144 @@
+        ESP32 SecurePanel — Guide complet de test            
+
+  ÉTAPE 1 — INSTALLATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1a. Copier le dossier site_php/ dans :
+    C:\xampp\htdocs\esp32\
+
+1b. Démarrer XAMPP → Apache + MySQL
+
+1c. Aller sur http://localhost/phpmyadmin
+    → Onglet "Importer" → choisir database.sql → Exécuter
+
+1d. Vérifier : la base "esp32_security" apparaît dans la liste
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 2 — TROUVER L'IP DE TON PC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ouvrir cmd.exe et taper : ipconfig
+Chercher "Adresse IPv4" → ex: 192.168.1.12
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 3 — MODIFIER ET FLASHER L'ESP32
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ouvrir ESP32_SecurePanel.ino dans Arduino IDE
+Modifier les 3 lignes :
+
+  const char* WIFI_SSID = "TON_WIFI";
+  const char* WIFI_PASS = "TON_MOT_DE_PASSE";
+  const char* SERVER_IP = "192.168.1.12";   ← IP de ton PC
+
+Bibliothèques à installer (Gestionnaire de bibliothèques) :
+  → Keypad          (by Mark Stanley)
+  → DHT sensor library  (by Adafruit)
+  → Adafruit Unified Sensor  (dépendance de DHT)
+
+Sélectionner la carte :
+  → Outils → Carte → ESP32 Dev Module
+
+Flasher (Upload)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 4 — VÉRIFIER LA CONNEXION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dans le Serial Monitor (115200 bauds), tu dois voir :
+
+  ================================
+    ESP32 SecurePanel v2.0
+    Code actuel: 1234
+  ================================
+  Connexion WiFi..........
+  ✓ WiFi: 192.168.1.15
+
+Si tu vois "WiFi échoué" → vérifie SSID/PASS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 5 — POURQUOI TEMPÉRATURE/HUMIDITÉ/TENSION N'AFFICHE PAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CAUSE 1 — Capteur DHT mal branché
+  → Broche DATA du DHT11 → GPIO19
+  → VCC → 3.3V
+  → GND → GND
+  → Résistance pull-up 10kΩ entre DATA et VCC
+  → Dans Serial Monitor tu dois voir : 🌡 24.5°C | 💧 62.0%
+  → Si tu vois "⚠ Capteur DHT non lu" → problème câblage
+
+CAUSE 2 — Délai de 10s avant premier envoi
+  → L'ESP32 attend 10 secondes avant le premier push
+  → Attendre et actualiser le dashboard
+
+CAUSE 3 — URL du serveur incorrecte
+  → Dans Serial Monitor vérifier : "✓ Push OK"
+  → Si "✗ Push échoué HTTP -1" → IP incorrecte dans SERVER_IP
+  → Tester dans navigateur : http://192.168.1.12/esp32/fetch_data.php?action=get_commands&key=ESP32SECRET
+  → Tu dois voir un JSON : {"alarm_active":0,"led_blue_level":"off",...}
+
+CAUSE 4 — Base de données non importée
+  → Vérifier que la table sensor_data existe dans phpMyAdmin
+
+CAUSE 5 — ESP32 et PC pas sur le même réseau
+  → Les deux doivent être sur le même WiFi/réseau local
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 6 — TESTER LES FONCTIONNALITÉS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LOGIN :
+  → http://localhost/esp32/
+  → Username: admin | Password: admin123
+
+TEST CAPTEURS :
+  → Dashboard → attendre 10s → température/humidité/tension apparaissent
+  → Graphique se met à jour toutes les 10s
+
+TEST LED BLEUE (4 niveaux PWM) :
+  → Controls → LED BLEUE → cliquer OFF / LOW / MEDIUM / HIGH
+  → Dans Serial Monitor : "LED bleue: high (PWM=255)"
+  → La LED change d'intensité en 5 secondes max
+
+TEST BUZZER :
+  → Controls → DÉCLENCHER BUZZER
+  → Le buzzer sonne 2 secondes sur l'ESP32
+  → Serial Monitor : "🔔 Buzzer activé depuis le site"
+
+TEST CLAVIER :
+  → Taper 1234 sur le keypad → LED verte s'allume
+  → Taper un mauvais code → buzzer + blocage temporaire
+  → Le log apparaît dans Dashboard → Recent Activity
+
+TEST CHANGEMENT CODE :
+  → Admin → CHANGER LE CODE PORTE → entrer nouveau code ex: 5678
+  → Dans 5 secondes, Serial Monitor : "✓ Nouveau code reçu: 5678"
+  → Tester le nouveau code sur le keypad
+
+TEST CHANGEMENT MOT DE PASSE :
+  → Admin → CHANGER LE MOT DE PASSE
+  → Entrer mot de passe actuel (admin123) + nouveau mot de passe
+  → Se déconnecter et se reconnecter avec le nouveau mot de passe
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  IDENTIFIANTS PAR DÉFAUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Login site  : admin / admin123
+  Code porte  : 1234
+  Clé API     : ESP32SECRET
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  BROCHAGE ESP32
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  GPIO15 → LED Verte (+ résistance 220Ω → GND)
+  GPIO2  → LED Rouge (+ résistance 220Ω → GND)
+  GPIO4  → LED Bleue (+ résistance 220Ω → GND) [PWM]
+  GPIO23 → Buzzer (+ → GPIO23, - → GND)
+  GPIO34 → Mesure tension (diviseur résistif si > 3.3V)
+  GPIO19 → DHT11 DATA (+ résistance 10kΩ vers 3.3V)
+  GPIO13,12,14,27 → Lignes Keypad (ROWS)
+  GPIO26,25,33,32 → Colonnes Keypad (COLS)
+
