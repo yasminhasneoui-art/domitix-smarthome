@@ -10,7 +10,7 @@ The project focuses on automation, security, and energy efficiency.
 -  Simple interface for user interaction
 -  Basic security and access control
 -  Expandable IoT architecture
--  
+
 ##  Technologies Used
 
 - C / C++
